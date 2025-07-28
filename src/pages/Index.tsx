@@ -10,6 +10,7 @@ interface Video {
   title: string;
   description: string;
   thumbnail: string;
+  previewFrames: string[];
   views: number;
   duration: string;
   category: string;
@@ -27,6 +28,7 @@ const Index = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [popularPage, setPopularPage] = useState(1);
   const [hoveredVideo, setHoveredVideo] = useState<number | null>(null);
+  const [currentFrame, setCurrentFrame] = useState<{ [key: number]: number }>({});
   const videosPerPage = 9;
   const popularVideosPerPage = 6;
 
@@ -66,6 +68,11 @@ const Index = () => {
     title: videoTitles[i % videoTitles.length] || `Интересное видео ${i + 1}`,
     description: `В этом увлекательном видео мы подробно разбираем актуальные темы современных технологий. Вы узнаете практические советы от экспертов индустрии и сможете применить полученные знания в своих проектах.`,
     thumbnail: thumbnails[i % thumbnails.length],
+    previewFrames: [
+      thumbnails[i % thumbnails.length],
+      thumbnails[(i + 1) % thumbnails.length],
+      thumbnails[(i + 2) % thumbnails.length]
+    ],
     views: Math.floor(Math.random() * 100000) + 1000,
     duration: `${Math.floor(Math.random() * 10) + 1}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
     category: categories[Math.floor(Math.random() * categories.length)].name,
@@ -89,48 +96,75 @@ const Index = () => {
     return popularVideos.slice(startIndex, startIndex + popularVideosPerPage);
   };
 
-  const VideoCard = ({ video, showViews = true }: { video: Video; showViews?: boolean }) => (
-    <Card 
-      className="group cursor-pointer overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-lg bg-white/80 backdrop-blur-sm border-0 shadow-md"
-      onMouseEnter={() => setHoveredVideo(video.id)}
-      onMouseLeave={() => setHoveredVideo(null)}
-    >
-      <div className="relative overflow-hidden">
-        <img 
-          src={video.thumbnail} 
-          alt={video.title}
-          className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-110"
-        />
-        <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-sm">
-          {video.duration}
-        </div>
-        {hoveredVideo === video.id && (
-          <div className="absolute inset-0 bg-black/20 flex items-center justify-center animate-fade-in">
-            <Button size="lg" className="bg-white/90 text-black hover:bg-white">
-              <Icon name="Play" size={24} />
-            </Button>
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (hoveredVideo) {
+      interval = setInterval(() => {
+        setCurrentFrame(prev => ({
+          ...prev,
+          [hoveredVideo]: ((prev[hoveredVideo] || 0) + 1) % 3
+        }));
+      }, 800);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [hoveredVideo]);
+
+  const VideoCard = ({ video, showViews = true }: { video: Video; showViews?: boolean }) => {
+    const isHovered = hoveredVideo === video.id;
+    const frameIndex = currentFrame[video.id] || 0;
+    const currentImage = isHovered ? video.previewFrames[frameIndex] : video.thumbnail;
+
+    return (
+      <Card 
+        className="group cursor-pointer overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-lg bg-white/80 backdrop-blur-sm border-0 shadow-md"
+        onMouseEnter={() => {
+          setHoveredVideo(video.id);
+          setCurrentFrame(prev => ({ ...prev, [video.id]: 0 }));
+        }}
+        onMouseLeave={() => {
+          setHoveredVideo(null);
+          setCurrentFrame(prev => ({ ...prev, [video.id]: 0 }));
+        }}
+      >
+        <div className="relative overflow-hidden">
+          <img 
+            src={currentImage}
+            alt={video.title}
+            className="w-full h-48 object-cover transition-all duration-300 group-hover:scale-110"
+          />
+          <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-sm">
+            {video.duration}
           </div>
-        )}
-      </div>
-      <CardContent className="p-4">
-        <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-coral transition-colors">
-          {video.title}
-        </h3>
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-          {video.description}
-        </p>
-        <div className="flex items-center justify-between text-sm text-gray-500">
-          {showViews && (
-            <span className="flex items-center gap-1">
-              <Icon name="Eye" size={16} />
-              {video.views.toLocaleString()} просмотров
-            </span>
+          {isHovered && (
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center animate-fade-in">
+              <Button size="lg" className="bg-white/90 text-black hover:bg-white">
+                <Icon name="Play" size={24} />
+              </Button>
+            </div>
           )}
-          <span>{video.uploadDate}</span>
         </div>
-      </CardContent>
-    </Card>
-  );
+        <CardContent className="p-4">
+          <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-coral transition-colors">
+            {video.title}
+          </h3>
+          <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+            {video.description}
+          </p>
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            {showViews && (
+              <span className="flex items-center gap-1">
+                <Icon name="Eye" size={16} />
+                {video.views.toLocaleString()} просмотров
+              </span>
+            )}
+            <span>{video.uploadDate}</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-blue/20 via-turquoise/10 to-lavender/20">
